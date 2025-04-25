@@ -80,11 +80,14 @@
         <jupiter.version>5.10.1</jupiter.version>
         <find.bug.version>3.0.1</find.bug.version>
         <jetbrain.annotation.version>24.1.0</jetbrain.annotation.version>
-        <keycloak.version>25.0.6</keycloak.version>
+        <keycloak.version>26.0.0</keycloak.version>
         <lombok.version>1.18.36</lombok.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok.mapstruct.biding.version>0.2.0</lombok.mapstruct.biding.version>
         <assertj.version>3.27.3</assertj.version>
+        <javassist.version>3.30.2-GA</javassist.version>
+        <testcontainers.version>1.20.4</testcontainers.version>
+        <awaitility.version>4.2.2</awaitility.version>
 
         <image.tag>${project.version}</image.tag>
         <image.repository></image.repository>
@@ -103,6 +106,12 @@
     </dependencyManagement>
 
     <dependencies>
+
+        <dependency>
+            <groupId>org.javassist</groupId>
+            <artifactId>javassist</artifactId>
+            <version>${javassist.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.keycloak</groupId>
@@ -172,6 +181,27 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>${awaitility.version}</version>
+            <scope>test</scope>
+        </dependency>
+
 
         <!-- SUPPORT -->
 
@@ -218,8 +248,8 @@
                 </configuration>
                 <executions>
                     <execution>
-                        <id>docker:push</id>
-                        <phase>install</phase>
+                        <id>docker:build</id>
+                        <phase>pre-integration-test</phase>
                         <goals>
                             <goal>build</goal>
                         </goals>
@@ -257,7 +287,6 @@
                 <version>3.0.0-M7</version>
                 <configuration>
                     <excludes>
-                        <exclude>**/*TestDocumentRepositoryBase.java</exclude>
                         <exclude>**/*IntegrationTest.java</exclude>
                     </excludes>
                 </configuration>
@@ -270,6 +299,12 @@
                     <includes>
                         <include>**/*IntegrationTest.java</include>
                     </includes>
+                    <systemPropertyVariables>
+                        <property>
+                            <name>PROJECT_VERSION</name>
+                            <value>${project.version}</value>
+                        </property>
+                    </systemPropertyVariables>
                 </configuration>
                 <executions>
                     <execution>

@@ -45,8 +45,7 @@ public class Deserialization {
         List<RealmDefinition> result = new ArrayList<>();
 
         JsonFactory factory = getObjectMapper(JsonSerialization.mapper).getFactory();
-        JsonParser parser = factory.createParser(is);
-        try {
+        try (JsonParser parser = factory.createParser(is)) {
             parser.nextToken();
 
             if (parser.getCurrentToken() == JsonToken.START_ARRAY) {
@@ -59,7 +58,7 @@ public class Deserialization {
 
                     // Ensure that master realm is imported first
                     if (Config.getAdminRealm().equals(realmRep.getRealm())) {
-                        result.add(0, realmRep);
+                        result.addFirst(realmRep);
                     } else {
                         result.add(realmRep);
                     }
@@ -70,8 +69,6 @@ public class Deserialization {
                 RealmDefinition realmDefinition = parser.readValueAs(RealmDefinition.class);
                 result.add(realmDefinition);
             }
-        } finally {
-            parser.close();
         }
 
         return result;

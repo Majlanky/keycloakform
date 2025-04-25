@@ -14,35 +14,41 @@
  * limitations under the License.
  */
 
-package com.groocraft.keycloakform.updater;
-
-import com.groocraft.keycloakform.definition.RealmDefinition;
+package com.groocraft.keycloakform.former;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.keycloak.models.ClientModel;
+import org.keycloak.models.ClientScopeModel;
+import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.mockito.Answers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class RealmUpdaterImplTest {
+class FormerContextTest {
 
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS) RealmModel realm;
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS) KeycloakSession session;
+    @Mock ClientModel client;
+    @Mock ClientScopeModel clientScope;
+    @Mock RealmModel realm;
 
     @Test
-    void testNoInteractionWithModelWhenDefinitionEmpty() {
-        RealmUpdater updater = new RealmUpdater();
-        RealmDefinition definition = new RealmDefinition();
+    void testContextIsProxyingKeycloakSession() {
+        FormerContext context = new FormerContext(session);
+        context.setClient(client);
+        context.setClientScope(clientScope);
+        context.setRealm(realm);
 
-        updater.update(realm, definition);
+        verify(session.getContext()).setClient(client);
+        verify(session.getContext()).setRealm(realm);
 
-        assertThat(mockingDetails(realm).getInvocations().stream().map(i -> i.getMethod().getName()).toList())
-            .map(name -> name.substring(0, 3))
-            .doesNotContain("set");
+        assertThat(context.getSession()).isSameAs(session);
+        assertThat(context.getClientScope()).isSameAs(clientScope);
     }
 
 }

@@ -19,28 +19,27 @@ package com.groocraft.keycloakform.utils;
 import com.groocraft.keycloakform.definition.deserialization.Deserialization;
 
 import org.junit.jupiter.api.Test;
-import org.keycloak.util.JsonSerialization;
 
 import java.net.URL;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 class DeserializationTest {
 
     @Test
-    void testSingleRealmFileIsProcessed(){
-        URL definitionUrl = getClass().getClassLoader().getResource("realm-export.json");
-        assertDoesNotThrow(() -> Deserialization.getRealmsFromStream( definitionUrl.openStream()));
-    }
-
-    @Test
-    void testMultiRealmFileIsProcessed(){
-        URL definitionUrl = getClass().getClassLoader().getResource("multi-realm-export.json");
+    void testSingleRealmFileIsProcessed() {
+        URL definitionUrl = getClass().getClassLoader().getResource("realm.json");
         assertDoesNotThrow(() -> Deserialization.getRealmsFromStream(definitionUrl.openStream()));
     }
 
     @Test
-    void testParsingIsDoneProperly(){
+    void testMultiRealmFileIsProcessed() {
+        URL definitionUrl = getClass().getClassLoader().getResource("realms.json");
+        assertDoesNotThrow(() -> Deserialization.getRealmsFromStream(definitionUrl.openStream()));
+    }
+
+    @Test
+    void testParsingIsDoneProperly() {
         //FIXME
     }
 

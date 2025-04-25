@@ -22,7 +22,9 @@ import com.groocraft.keycloakform.definition.RealmDefinition;
 import com.groocraft.keycloakform.definition.deserialization.Deserialization;
 import com.groocraft.keycloakform.exception.DefinitionFileDeserializationException;
 import com.groocraft.keycloakform.exception.DefinitionFileReadingException;
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.FormersFactory;
+import com.groocraft.keycloakform.former.SyncMode;
 
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.utils.KeycloakModelUtils;
@@ -64,7 +66,6 @@ public class FormingInitializer implements ProviderEventListener {
     private final FormerConfig config;
     private final List<RealmDefinition> definitions;
     private final FormersFactory formersFactory;
-    private final ObjectMapper mapper = Deserialization.getObjectMapper(JsonSerialization.mapper);
 
     public FormingInitializer(FormerConfig config, FormersFactory formersFactory) {
         this.config = config;
@@ -83,9 +84,14 @@ public class FormingInitializer implements ProviderEventListener {
 
     private void process(KeycloakSession session, List<RealmDefinition> definitions) {
         if (config.isDryRun()) {
-            log.info("Keycloakform is running in dry run mode so it will not do any changes, just share its plans");
+            log.info("Keycloakform is running in dry run mode. Everything will happen normally but transaction will be aborted");
         }
-        formersFactory.getForCollectionOf(RealmDefinition.class).form(definitions, session, config.isDryRun());
+        FormerContext context = new FormerContext(session);
+        formersFactory.getForCollectionOf(RealmDefinition.class).form(definitions, context, SyncMode.FULL);
+        if (config.isDryRun()) {
+            //this should make all changes rolled back not committed
+            session.getTransactionManager().setRollbackOnly();
+        }
     }
 
     private List<RealmDefinition> readRealmsDefinition(InputStream inputStream) {

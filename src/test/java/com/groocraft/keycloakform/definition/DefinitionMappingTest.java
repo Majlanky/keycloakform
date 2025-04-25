@@ -20,20 +20,20 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DefinitionMappingTest {
@@ -41,26 +41,26 @@ class DefinitionMappingTest {
     @Mock ObjectMapper objectMapper;
 
     @Test
-    void testNonDefinitionObjectThrowsExceptionDuringCast(){
+    void testNonDefinitionObjectThrowsExceptionDuringCast() {
         assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> DefinitionMapping.cast("test"));
     }
 
     @Test
-    void testNonDefinitionCollectionThrowsExceptionDuringCast(){
+    void testNonDefinitionCollectionThrowsExceptionDuringCast() {
         assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> DefinitionMapping.cast(List.of("test")));
     }
 
     @Test
-    void testAllDefinitionMappingsAreRegistered(){
+    void testAllDefinitionMappingsAreRegistered() {
         ArgumentCaptor<Class<Object>> classCaptor = ArgumentCaptor.forClass(Class.class);
         ArgumentCaptor<JsonDeserializer<Object>> deserializerCaptor = ArgumentCaptor.forClass(JsonDeserializer.class);
-        try(MockedConstruction<SimpleModule> smm = mockConstruction(SimpleModule.class, (mock, context) -> {
+        try (MockedConstruction<SimpleModule> smm = mockConstruction(SimpleModule.class, (mock, context) -> {
             when(mock.addDeserializer(classCaptor.capture(), deserializerCaptor.capture())).thenReturn(mock);
-        })){
+        })) {
             DefinitionMapping.init(objectMapper);
 
             assertThat(smm.constructed()).hasSize(1);
-            verify(objectMapper).registerModule(smm.constructed().get(0));
+            verify(objectMapper).registerModule(smm.constructed().getFirst());
         }
 
         assertThat(classCaptor.getAllValues()).hasSize(DefinitionMapping.values().length);

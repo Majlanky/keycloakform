@@ -19,19 +19,25 @@ package com.groocraft.keycloakform.former.item;
 import com.groocraft.keycloakform.definition.ClientDefinition;
 import com.groocraft.keycloakform.definition.DefinitionMapping;
 import com.groocraft.keycloakform.definition.ProtocolMapperDefinition;
+import com.groocraft.keycloakform.definition.RoleDefinition;
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.FormersFactory;
 import com.groocraft.keycloakform.former.generic.DefaultItemFormer;
-import com.groocraft.keycloakform.updater.ClientUpdater;
 
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.ClientScopeModel;
+import org.keycloak.models.utils.KeycloakModelUtils;
+import org.keycloak.models.utils.RepresentationToModel;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import lombok.CustomLog;
 
 @CustomLog
 public class ClientFormer extends DefaultItemFormer<ClientModel, ClientDefinition> {
 
-    private final ClientUpdater updater = new ClientUpdater();
     private final FormersFactory formersFactory;
 
     public ClientFormer(FormersFactory formersFactory) {
@@ -40,48 +46,49 @@ public class ClientFormer extends DefaultItemFormer<ClientModel, ClientDefinitio
     }
 
     @Override
-    public void form(ClientDefinition definition, KeycloakSession session, boolean dryRun) {
-        super.form(definition, session, dryRun);
+    protected ClientModel getModel(ClientDefinition definition, FormerContext context) {
+        return context.getRealm().getClientByClientId(definition.getClientId());
+    }
 
+    @Override
+    protected ClientModel create(ClientDefinition definition, FormerContext context) {
+        String id = definition.getId() == null ? KeycloakModelUtils.generateId() : definition.getId();
+        return context.getRealm().addClient(id, definition.getClientId());
+    }
+
+    @Override
+    protected void update(ClientModel model, ClientDefinition definition, FormerContext context) {
+        context.setClient(model);
+
+        processClientScopes(model, definition.getDefaultClientScopes(), context, true);
+        processClientScopes(model, definition.getOptionalClientScopes(), context, false);
+
+        formersFactory.getForCollectionOf(RoleDefinition.class)
+            .form(DefinitionMapping.cast(context.getRealmDefinition()
+                .getRoles().getClient().get(definition.getClientId())), context, definition.getSyncMode());
         formersFactory.getForCollectionOf(ProtocolMapperDefinition.class)
-            .form(DefinitionMapping.cast(definition.getProtocolMappers()), session, dryRun);
+            .form(DefinitionMapping.cast(definition.getProtocolMappers()), context, definition.getSyncMode());
 
-        session.getContext().setClient(null);
+        RepresentationToModel.updateClient(definition, model, context.getSession());
+
+        context.setClient(null);
     }
 
-    @Override
-    protected void update(ClientModel clientModel, ClientDefinition definition, KeycloakSession session, boolean dryRun,
-                          String logIdentifier) {
-        super.update(clientModel, definition, session, dryRun, logIdentifier);
-        session.getContext().setClient(clientModel);
-    }
+    private void processClientScopes(ClientModel model, List<String> toAssign, FormerContext context,  boolean defaultScope){
+        if(toAssign != null ) {
+            Map<String, ClientScopeModel> namedClientScopes = context.getRealm().getClientScopesStream()
+                .collect(Collectors.toMap(ClientScopeModel::getName, cs -> cs));
 
-    @Override
-    protected ClientModel getKeycloakResource(ClientDefinition definition, KeycloakSession session) {
-        if (definition.getId() != null) {
-            return session.getContext().getRealm().getClientById(definition.getId());
+            model.getClientScopes(defaultScope).forEach((name, cs) -> {
+                if (!toAssign.contains(name)) {
+                    model.removeClientScope(cs);
+                } else {
+                    toAssign.remove(name);
+                }
+            });
+
+            toAssign.forEach(name -> model.addClientScope(namedClientScopes.get(name), defaultScope));
         }
-        return session.getContext().getRealm().getClientsStream().filter(clientModel -> clientModel.getName().equals(definition.getName()))
-            .findFirst().orElse(null);
-    }
-
-    @Override
-    protected ClientModel create(ClientDefinition definition, KeycloakSession session) {
-        if (definition.getId() != null) {
-            return session.getContext().getRealm().addClient(definition.getId(), definition.getName());
-        }
-
-        return session.getContext().getRealm().addClient(definition.getName());
-    }
-
-    @Override
-    protected void update(ClientModel clientModel, ClientDefinition definition) {
-        updater.update(clientModel, definition);
-    }
-
-    @Override
-    protected void updateCommit(ClientModel clientModel, KeycloakSession session) {
-        //Nothing to do here as client model is auto-commit
     }
 
     @Override
@@ -91,7 +98,7 @@ public class ClientFormer extends DefaultItemFormer<ClientModel, ClientDefinitio
 
     @Override
     protected String getLogIdentifier(ClientDefinition definition) {
-        return "Client " + definition.getName();
+        return "Client " + definition.getClientId() + "(" + definition.getId() + ")";
     }
 
     @Override

@@ -17,11 +17,13 @@
 package com.groocraft.keycloakform.former.item;
 
 import com.groocraft.keycloakform.definition.ProtocolMapperDefinition;
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.generic.DefaultItemFormer;
 import com.groocraft.keycloakform.updater.ProtocolMapperUpdater;
 
-import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.ProtocolMapperContainerModel;
 import org.keycloak.models.ProtocolMapperModel;
+import org.keycloak.models.utils.KeycloakModelUtils;
 
 import lombok.CustomLog;
 
@@ -35,36 +37,31 @@ public class ProtocolMapperFormer extends DefaultItemFormer<ProtocolMapperModel,
     }
 
     @Override
-    protected ProtocolMapperModel getKeycloakResource(ProtocolMapperDefinition definition, KeycloakSession session) {
-        if (definition.getId() != null) {
-            return session.getContext().getClient().getProtocolMapperById(definition.getId());
-        }
-
-        return session.getContext()
-            .getClient()
-            .getProtocolMappersStream()
-            .filter(protocolMapperModel -> protocolMapperModel.getName().equals(definition.getName()))
-            .findFirst()
-            .orElse(null);
+    protected ProtocolMapperModel getModel(ProtocolMapperDefinition definition, FormerContext context) {
+        return getCurrentlyManagedContainer(context).getProtocolMappersStream()
+            .filter(pm -> pm.getName().equals(definition.getName()))
+            .findFirst().orElse(null);
     }
 
     @Override
-    protected ProtocolMapperModel create(ProtocolMapperDefinition definition, KeycloakSession session) {
+    protected ProtocolMapperModel create(ProtocolMapperDefinition definition, FormerContext context) {
+        String id = definition.getId() == null ? KeycloakModelUtils.generateId() : definition.getId();
         ProtocolMapperModel protocolMapperModel = new ProtocolMapperModel();
         protocolMapperModel.setName(definition.getName());
-        protocolMapperModel.setId(definition.getId());
-        session.getContext().getClient().addProtocolMapper(protocolMapperModel);
+        protocolMapperModel.setId(id);
         return protocolMapperModel;
     }
 
     @Override
-    protected void update(ProtocolMapperModel protocolMapperModel, ProtocolMapperDefinition definition) {
-        updater.update(protocolMapperModel, definition);
-    }
+    protected void update(ProtocolMapperModel protocolMapperModel, ProtocolMapperDefinition definition, FormerContext context) {
+        updater.update(protocolMapperModel, definition, context);
 
-    @Override
-    protected void updateCommit(ProtocolMapperModel protocolMapperModel, KeycloakSession session) {
-        session.getContext().getClient().updateProtocolMapper(protocolMapperModel);
+        ProtocolMapperModel existing = getModel(definition, context);
+        if (existing == null) {
+            getCurrentlyManagedContainer(context).addProtocolMapper(protocolMapperModel);
+        } else {
+            getCurrentlyManagedContainer(context).updateProtocolMapper(protocolMapperModel);
+        }
     }
 
     @Override
@@ -81,4 +78,12 @@ public class ProtocolMapperFormer extends DefaultItemFormer<ProtocolMapperModel,
     public Class<ProtocolMapperDefinition> getDefinitionClass() {
         return ProtocolMapperDefinition.class;
     }
+
+    private ProtocolMapperContainerModel getCurrentlyManagedContainer(FormerContext context) {
+        if (context.getClient() != null) {
+            return context.getClient();
+        }
+        return context.getClientScope();
+    }
+
 }

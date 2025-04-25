@@ -16,15 +16,20 @@
 
 package com.groocraft.keycloakform.definition;
 
+import com.groocraft.keycloakform.former.SyncMode;
+
 import org.keycloak.representations.idm.RealmRepresentation;
 
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Realm is identified by id or name when the id unspecified
+ */
 @Getter
 @Setter
 public class RealmDefinition extends RealmRepresentation implements Definition {
 
-    private boolean managed = true;
+    private SyncMode syncMode = SyncMode.FULL;
 
 }

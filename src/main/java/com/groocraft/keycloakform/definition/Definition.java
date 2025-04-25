@@ -16,8 +16,10 @@
 
 package com.groocraft.keycloakform.definition;
 
+import com.groocraft.keycloakform.former.SyncMode;
+
 public interface Definition {
 
-    boolean isManaged();
+    SyncMode getSyncMode();
 
 }

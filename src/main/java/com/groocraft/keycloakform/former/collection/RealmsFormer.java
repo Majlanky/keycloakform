@@ -17,12 +17,12 @@
 package com.groocraft.keycloakform.former.collection;
 
 import com.groocraft.keycloakform.definition.RealmDefinition;
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.FormersFactory;
 import com.groocraft.keycloakform.former.ItemFormer;
 import com.groocraft.keycloakform.former.generic.DefaultCollectionFormer;
 
 import org.keycloak.Config;
-import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.services.managers.RealmManager;
 
@@ -55,24 +55,20 @@ public class RealmsFormer extends DefaultCollectionFormer<RealmDefinition> {
         super(formersFactory);
     }
 
-    protected void deleteUndeclaredKeycloakResources(Collection<RealmDefinition> definitions, KeycloakSession session, boolean dryRun) {
+    protected void deleteUndeclaredKeycloakResources(Collection<RealmDefinition> definitions, FormerContext context) {
         Set<String> definedRealms = new HashSet<>(definitions.stream().map(RealmDefinition::getRealm).toList());
         //to be sure that admin realm is untouched
         definedRealms.add(Config.getAdminRealm());
-        session.realms().getRealmsStream()
+        context.getSession().realms().getRealmsStream()
             .filter(m -> !definedRealms.contains(m.getName()))
-            .forEach(m -> remove(session, m, dryRun));
+            .forEach(m -> remove(context, m));
     }
 
-    private void remove(KeycloakSession session, RealmModel model, boolean dryRun) {
-        if (dryRun) {
-            log.infof("Realm %s is present but not in definition, would be deleted", model.getName());
-        } else {
-            log.infof("Realm %s is present but not in definition, deleting it", model.getName());
-            boolean removed = new RealmManager(session).removeRealm(model);
-            if (!removed) {
-                log.infof("Realm %s was not removed for unknown reason", model.getName());
-            }
+    private void remove(FormerContext context, RealmModel model) {
+        log.infof("Realm %s is present but not defined, deleting it", model.getName());
+        boolean removed = new RealmManager(context.getSession()).removeRealm(model);
+        if (!removed) {
+            log.infof("Realm %s was not removed for unknown reason", model.getName());
         }
     }
 

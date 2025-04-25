@@ -16,25 +16,51 @@
 
 package com.groocraft.keycloakform.former;
 
-import java.util.HashMap;
+import com.groocraft.keycloakform.definition.RealmDefinition;
 
+import org.keycloak.component.ComponentModel;
+import org.keycloak.models.AuthenticationFlowModel;
+import org.keycloak.models.ClientModel;
+import org.keycloak.models.ClientScopeModel;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.RealmModel;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
 public class FormerContext {
 
-    private static final ThreadLocal<HashMap<Class<?>, Object>> cache = new ThreadLocal<>();
+    @Setter
+    private ClientScopeModel clientScope;
+    @Setter
+    private RealmDefinition realmDefinition;
+    @Setter
+    private ComponentModel component;
+    @Setter
+    private String providerType;
+    @Setter
+    private AuthenticationFlowModel authenticationFlow;
+    private final KeycloakSession session;
 
-    public static void setCurrent(Object object) {
-        synchronized (cache) {
-            HashMap<Class<?>, Object> localCache = cache.get();
-            if (localCache == null) {
-                localCache = new HashMap<>();
-                cache.set(localCache);
-            }
-            localCache.put(object.getClass(), object);
-        }
+    public FormerContext(KeycloakSession session) {
+        this.session = session;
     }
 
-    public static <T> T getCurrent(Class<T> clazz) {
-        return (T) cache.get().get(clazz);
+    public ClientModel getClient() {
+        return session.getContext().getClient();
+    }
+
+    public void setClient(ClientModel client) {
+        session.getContext().setClient(client);
+    }
+
+    public RealmModel getRealm() {
+        return session.getContext().getRealm();
+    }
+
+    public void setRealm(RealmModel realm) {
+        session.getContext().setRealm(realm);
     }
 
 }

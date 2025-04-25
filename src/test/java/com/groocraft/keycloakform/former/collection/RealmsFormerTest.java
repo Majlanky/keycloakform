@@ -18,15 +18,14 @@ package com.groocraft.keycloakform.former.collection;
 
 import com.groocraft.keycloakform.definition.RealmDefinition;
 import com.groocraft.keycloakform.definition.deserialization.Deserialization;
+import com.groocraft.keycloakform.former.FormerContext;
+import com.groocraft.keycloakform.former.SyncMode;
 import com.groocraft.keycloakform.former.item.RealmFormer;
 import com.groocraft.keycloakform.utils.TestFormersFactory;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.services.managers.RealmManager;
 import org.mockito.Answers;
@@ -41,7 +40,6 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -53,8 +51,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class RealmsFormerTest {
 
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS) KeycloakSession session;
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS) FormerContext context;
     @Mock RealmFormer realmFormer;
+    @Mock RealmModel realmModel;
 
     TestFormersFactory formersFactory = new TestFormersFactory();
     List<RealmDefinition> definitions;
@@ -62,47 +61,36 @@ class RealmsFormerTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        URL definitionUrl = getClass().getClassLoader().getResource("multi-realm-export.json");
+        URL definitionUrl = getClass().getClassLoader().getResource("realms.json");
         definitions = Deserialization.getRealmsFromStream(definitionUrl.openStream());
         formersFactory.registerMock(RealmDefinition.class, realmFormer);
         former = new RealmsFormer(formersFactory);
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void testFormerRespectsDryRun(boolean dryRun) {
-        former.form(definitions, session, dryRun);
-
-        verify(realmFormer, times(2)).form(any(), eq(session), eq(dryRun));
-        verifyNoMoreInteractions(realmFormer);
-    }
-
     @Test
     void testFormerIsFormingOnlyManagedRealms() {
-        former.form(definitions, session, false);
+        former.form(definitions, context, SyncMode.FULL);
 
         ArgumentCaptor<RealmDefinition> definitionCaptor = ArgumentCaptor.forClass(RealmDefinition.class);
 
-        verify(realmFormer, times(2)).form(definitionCaptor.capture(), eq(session), eq(false));
+        verify(realmFormer, times(2)).form(definitionCaptor.capture(), eq(context));
         verifyNoMoreInteractions(realmFormer);
 
         assertThat(definitionCaptor.getAllValues()).map(RealmDefinition::getRealm).containsExactlyInAnyOrder("test", "master");
     }
 
     @Test
-    void testFormerIsDeletingNoRealmWhenDryRun() {
+    void testFormerIsDeletingNoRealmWhenSyncModeIgnore() {
 
         RealmModel masterModel = mock(RealmModel.class);
         RealmModel test2Model = mock(RealmModel.class);
-        when(masterModel.getName()).thenReturn("master");
-        when(test2Model.getName()).thenReturn("test2");
 
-        when(session.realms().getRealmsStream()).thenReturn(Stream.of(masterModel, test2Model));
+        when(context.getSession().realms().getRealmsStream()).thenReturn(Stream.of(masterModel, test2Model));
 
         ArgumentCaptor<RealmModel> modelCaptor = ArgumentCaptor.forClass(RealmModel.class);
         try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class,
             (mock, context) -> when(mock.removeRealm(modelCaptor.capture())).thenReturn(true))) {
-            former.form(definitions, session, true);
+            former.form(definitions, context, SyncMode.IGNORE);
         }
 
         assertThat(modelCaptor.getAllValues()).isEmpty();
@@ -110,19 +98,17 @@ class RealmsFormerTest {
     }
 
     @Test
-    void testFormerIsDeletingExcessRealmWhenNotDryrun() {
+    void testFormerIsDeletingExcessRealmWhenSyncModeFull() {
 
         RealmModel masterModel = mock(RealmModel.class);
         RealmModel test2Model = mock(RealmModel.class);
-        when(masterModel.getName()).thenReturn("master");
-        when(test2Model.getName()).thenReturn("test2");
 
-        when(session.realms().getRealmsStream()).thenReturn(Stream.of(masterModel, test2Model));
+        when(context.getSession().realms().getRealmsStream()).thenReturn(Stream.of(masterModel, test2Model));
 
         ArgumentCaptor<RealmModel> modelCaptor = ArgumentCaptor.forClass(RealmModel.class);
         try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class,
             (mock, context) -> when(mock.removeRealm(modelCaptor.capture())).thenReturn(true))) {
-            former.form(definitions, session, false);
+            former.form(definitions, context, SyncMode.FULL);
         }
 
         assertThat(modelCaptor.getValue()).isEqualTo(test2Model);

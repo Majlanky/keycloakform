@@ -17,17 +17,16 @@
 package com.groocraft.keycloakform.former.collection;
 
 import com.groocraft.keycloakform.definition.ProtocolMapperDefinition;
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.FormersFactory;
 import com.groocraft.keycloakform.former.generic.DefaultCollectionFormer;
 
-import org.keycloak.models.ClientModel;
-import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.ProtocolMapperContainerModel;
 import org.keycloak.models.ProtocolMapperModel;
-import org.keycloak.models.RealmModel;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import lombok.CustomLog;
 
@@ -39,31 +38,30 @@ public class ProtocolMappersFormer extends DefaultCollectionFormer<ProtocolMappe
     }
 
     @Override
-    protected void deleteUndeclaredKeycloakResources(Collection<ProtocolMapperDefinition> definitions, KeycloakSession session,
-                                                     boolean dryRun) {
-        Set<String> definedMappers = new HashSet<>(definitions.stream().map(ProtocolMapperDefinition::getName).toList());
+    protected void deleteUndeclaredKeycloakResources(Collection<ProtocolMapperDefinition> definitions, FormerContext context) {
+        Set<String> definedMappers = definitions.stream().map(ProtocolMapperDefinition::getName).collect(Collectors.toSet());
 
-        ClientModel client = session.getContext().getClient();
-        RealmModel realm = session.getContext().getRealm();
+        ProtocolMapperContainerModel container = getCurrentlyManagedContainer(context);
 
-        client.getProtocolMappersStream()
+        container.getProtocolMappersStream()
             .filter(m -> !definedMappers.contains(m.getName()))
-            .forEach(m -> remove(m, client, realm, dryRun));
+            .forEach(m -> remove(m, container));
     }
 
-    private void remove(ProtocolMapperModel mapper, ClientModel client, RealmModel realm, boolean dryRun) {
-        if (dryRun) {
-            log.infof("Protocol mapper %s of client %s of realm %s is present but not in definition, would be deleted",
-                mapper.getName(), client.getName(), realm.getName());
-        } else {
-            log.infof("Protocol mapper %s of client %s of realm %s is present but not in definition, deleting it",
-                mapper.getName(), client.getName(), realm.getName());
-            client.removeProtocolMapper(mapper);
-        }
+    private void remove(ProtocolMapperModel mapper, ProtocolMapperContainerModel container) {
+        log.infof("Protocol mapper %s is present but not defined, deleting it", mapper.getName());
+        container.removeProtocolMapper(mapper);
     }
 
     @Override
     public Class<ProtocolMapperDefinition> getDefinitionClass() {
         return ProtocolMapperDefinition.class;
+    }
+
+    private ProtocolMapperContainerModel getCurrentlyManagedContainer(FormerContext context) {
+        if (context.getClient() != null) {
+            return context.getClient();
+        }
+        return context.getClientScope();
     }
 }

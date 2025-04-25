@@ -17,11 +17,11 @@
 package com.groocraft.keycloakform.former.collection;
 
 import com.groocraft.keycloakform.definition.ClientDefinition;
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.FormersFactory;
 import com.groocraft.keycloakform.former.generic.DefaultCollectionFormer;
 
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 
 import java.util.Collection;
@@ -38,25 +38,21 @@ public class ClientsFormer extends DefaultCollectionFormer<ClientDefinition> {
     }
 
     @Override
-    protected void deleteUndeclaredKeycloakResources(Collection<ClientDefinition> definitions, KeycloakSession session, boolean dryRun) {
-        Set<String> definedClients = new HashSet<>(definitions.stream().map(ClientDefinition::getName).toList());
+    protected void deleteUndeclaredKeycloakResources(Collection<ClientDefinition> definitions, FormerContext context) {
+        Set<String> definedClientIds = new HashSet<>(definitions.stream().map(ClientDefinition::getClientId).toList());
 
-        RealmModel realm = session.getContext().getRealm();
+        RealmModel realm = context.getRealm();
 
         realm.getClientsStream()
-            .filter(c -> !definedClients.contains(c.getName()))
-            .forEach(m -> remove(m, realm, dryRun));
+            .filter(c -> !definedClientIds.contains(c.getClientId()))
+            .forEach(m -> remove(m, realm));
     }
 
-    private void remove(ClientModel client, RealmModel realm, boolean dryRun) {
-        if (dryRun) {
-            log.infof("Client %s of realm %s is present but not in definition, would be deleted", client.getName(), realm.getName());
-        } else {
-            log.infof("Client %s of realm %s is present but not in definition, deleting it", client.getName(), realm.getName());
-            boolean removed = realm.removeClient(client.getId());
-            if (!removed) {
-                log.infof("Client %s of realm %s was not removed for unknown reason", client.getName(), realm.getName());
-            }
+    private void remove(ClientModel client, RealmModel realm) {
+        log.infof("Client %s of realm %s is present but not defined, deleting it", client.getClientId(), realm.getName());
+        boolean removed = realm.removeClient(client.getId());
+        if (!removed) {
+            log.infof("Client %s of realm %s was not removed for unknown reason", client.getClientId(), realm.getName());
         }
     }
 

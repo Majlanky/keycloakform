@@ -17,6 +17,7 @@
 package com.groocraft.keycloakform.updater;
 
 import com.groocraft.keycloakform.definition.ProtocolMapperDefinition;
+import com.groocraft.keycloakform.former.FormerContext;
 
 import org.keycloak.models.ProtocolMapperModel;
 
@@ -26,34 +27,27 @@ import java.util.Map;
 public class ProtocolMapperUpdater implements Updater<ProtocolMapperModel, ProtocolMapperDefinition> {
 
     @Override
-    public void update(ProtocolMapperModel keycloakResource, ProtocolMapperDefinition definition) {
-        if ( definition == null ) {
+    public void update(ProtocolMapperModel model, ProtocolMapperDefinition definition, FormerContext context) {
+        if (definition == null) {
             return;
         }
 
-        if ( definition.getId() != null ) {
-            keycloakResource.setId( definition.getId() );
+        if (definition.getName() != null) {
+            model.setName(definition.getName());
         }
-        if ( definition.getName() != null ) {
-            keycloakResource.setName( definition.getName() );
+        if (definition.getProtocol() != null) {
+            model.setProtocol(definition.getProtocol());
         }
-        if ( definition.getProtocol() != null ) {
-            keycloakResource.setProtocol( definition.getProtocol() );
+        if (definition.getProtocolMapper() != null) {
+            model.setProtocolMapper(definition.getProtocolMapper());
         }
-        if ( definition.getProtocolMapper() != null ) {
-            keycloakResource.setProtocolMapper( definition.getProtocolMapper() );
-        }
-        if ( keycloakResource.getConfig() != null ) {
-            Map<String, String> config = definition.getConfig();
-            if ( config != null ) {
-                keycloakResource.getConfig().clear();
-                keycloakResource.getConfig().putAll( config );
-            }
-        }
-        else {
-            Map<String, String> config = definition.getConfig();
-            if ( config != null ) {
-                keycloakResource.setConfig( new LinkedHashMap<>( config ) );
+        if (definition.getConfig() != null) {
+            Map<String, String> config = model.getConfig();
+            if (config != null) {
+                config.clear();
+                config.putAll(definition.getConfig());
+            } else {
+                model.setConfig(new LinkedHashMap<>(definition.getConfig()));
             }
         }
     }

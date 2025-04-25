@@ -1,4 +1,3 @@
-version: "3.1"
 networks:
   default:
 services:
@@ -8,30 +7,25 @@ services:
     networks:
       default:
         aliases:
-          - db
-    ports:
-      - "3306:3306"
+          - test-db
     environment:
       - MYSQL_ROOT_PASSWORD=root
     volumes:
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
 
   keycloak:
-    image: keycloakform:local
+    image: "keycloakform:${PROJECT_VERSION}"
     depends_on:
       - database
-      - mail-server
     networks:
       default:
         aliases:
-          - keycloak
-    ports:
-      - "23080:8080"
+          - test-keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_DB: mariadb
-      KC_DB_URL: jdbc:mariadb://db:3306/keycloak?characterEncoding=UTF-8
+      KC_DB_URL: jdbc:mariadb://test-db:3306/keycloak?characterEncoding=UTF-8
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: keycloak1234
     command:
@@ -41,19 +35,8 @@ services:
       - "--http-enabled=true"
       - "--http-port=8080"
       - "--hostname-strict=false"
-      - "--spi-import-keycloakform-source-file=/opt/keycloak/data/definition.json"
-      #- "--spi-import-keycloakform-dry-run=true"
+      - "--spi-import-keycloakform-source-file=/opt/keycloak/data/realms.json"
 
     volumes:
-      - ./definition.json:/opt/keycloak/data/definition.json
-
-  mail-server:
-    image: mailhog/mailhog:v1.0.1
-    restart: unless-stopped
-    networks:
-      default:
-        aliases:
-          - mailhog
-    ports:
-      - "11025:1025"
-      - "8025:8025"
+      - ./realms.json:/opt/keycloak/data/realms.json
+      - ./export:/opt/keycloak/data/export

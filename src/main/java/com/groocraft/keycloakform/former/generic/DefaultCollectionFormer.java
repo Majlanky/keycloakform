@@ -18,9 +18,9 @@ package com.groocraft.keycloakform.former.generic;
 
 import com.groocraft.keycloakform.definition.Definition;
 import com.groocraft.keycloakform.former.CollectionFormer;
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.FormersFactory;
-
-import org.keycloak.models.KeycloakSession;
+import com.groocraft.keycloakform.former.SyncMode;
 
 import java.util.Collection;
 
@@ -33,16 +33,22 @@ public abstract class DefaultCollectionFormer<DefinitionT extends Definition> im
     private final FormersFactory formersFactory;
 
     @Override
-    public void form(Collection<DefinitionT> definitions, KeycloakSession session, boolean dryRun) {
-        definitions.forEach(d -> formOne(d, session, dryRun));
+    public void form(Collection<DefinitionT> definitions, FormerContext context, SyncMode syncMode) {
+        definitions.forEach(d -> formOne(d, context));
 
-        deleteUndeclaredKeycloakResources(definitions, session, dryRun);
+        if(syncMode == SyncMode.FULL) {
+            deleteUndeclaredKeycloakResources(definitions, context);
+        }
     }
 
-    protected abstract void deleteUndeclaredKeycloakResources(Collection<DefinitionT> definitions, KeycloakSession session, boolean dryRun);
+    protected abstract void deleteUndeclaredKeycloakResources(Collection<DefinitionT> definitions, FormerContext context);
 
-    protected void formOne(DefinitionT definition, KeycloakSession session, boolean dryRun) {
-        formersFactory.getFor(definition).form(definition, session, dryRun);
+    protected void formOne(DefinitionT definition, FormerContext context) {
+        formersFactory.getFor(definition).form(definition, context);
+    }
+
+    protected FormersFactory getFormersFactory() {
+        return formersFactory;
     }
 
 }

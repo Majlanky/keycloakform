@@ -30,6 +30,7 @@ public interface FormersFactory {
 
     <DefinitionT> CollectionFormer<DefinitionT> getForCollectionOf(Class<DefinitionT> definitionTClass);
 
+    @SuppressWarnings("unchecked")
     default <DefinitionT> ItemFormer<DefinitionT> getFor(DefinitionT definition) {
         if (definition == null) {
             throw new IllegalArgumentException("Definition object must not be null when asking for former");
@@ -38,6 +39,7 @@ public interface FormersFactory {
         return getFor(clazz);
     }
 
+    @SuppressWarnings("unchecked")
     default <DefinitionT> CollectionFormer<DefinitionT> getForCollectionOf(DefinitionT definition) {
         if (definition == null) {
             throw new IllegalArgumentException("Definition object must not be null when asking for former");

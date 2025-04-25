@@ -16,6 +16,8 @@
 
 package com.groocraft.keycloakform.definition;
 
+import com.groocraft.keycloakform.former.SyncMode;
+
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 
 import lombok.Getter;
@@ -25,6 +27,6 @@ import lombok.Setter;
 @Setter
 public class ProtocolMapperDefinition extends ProtocolMapperRepresentation implements Definition {
 
-    private boolean managed = true;
+    private SyncMode syncMode = SyncMode.FULL;
 
 }

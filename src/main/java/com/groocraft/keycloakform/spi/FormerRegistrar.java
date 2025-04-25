@@ -45,7 +45,6 @@ import org.keycloak.models.KeycloakSessionFactory;
  *
  * @author Majlanky
  */
-//FIXME add possibility of multiple files in dir for easier gitops
 public class FormerRegistrar implements ImportProviderFactory {
 
     private static final String DRY_RUN = "dryRun";

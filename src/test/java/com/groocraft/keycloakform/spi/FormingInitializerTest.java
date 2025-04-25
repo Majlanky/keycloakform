@@ -21,16 +21,13 @@ import com.groocraft.keycloakform.definition.RealmDefinition;
 import com.groocraft.keycloakform.definition.deserialization.Deserialization;
 import com.groocraft.keycloakform.exception.DefinitionFileDeserializationException;
 import com.groocraft.keycloakform.exception.DefinitionFileReadingException;
+import com.groocraft.keycloakform.former.SyncMode;
 import com.groocraft.keycloakform.former.collection.RealmsFormer;
 import com.groocraft.keycloakform.utils.TestFormersFactory;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.KeycloakSessionTask;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.models.utils.PostMigrationEvent;
@@ -46,7 +43,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,42 +63,14 @@ class FormingInitializerTest {
 
     @BeforeEach
     void setUp() {
-        sourceFilePath = getClass().getClassLoader().getResource("realm-export.json").getPath();
+        sourceFilePath = getClass().getClassLoader().getResource("realm.json").getPath();
         formersFactory.registerCollectionMock(RealmDefinition.class, realmsFormer);
     }
 
     @Test
     void testInitIsThrowingWhenSourceFileNotExist() {
-        when(config.getSourceFile()).thenReturn("missing-realm-export.json");
+        when(config.getSourceFile()).thenReturn("realms.json");
         assertThatExceptionOfType(DefinitionFileReadingException.class).isThrownBy(() -> new FormingInitializer(config, formersFactory));
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void testOnEventIsStartingProcessingOfRealms(boolean dryRun) {
-        when(config.getSourceFile()).thenReturn(sourceFilePath);
-        when(config.isDryRun()).thenReturn(dryRun);
-
-        FormingInitializer initializer = new FormingInitializer(config, formersFactory);
-        ArgumentCaptor<KeycloakSessionTask> task = ArgumentCaptor.forClass(KeycloakSessionTask.class);
-        ArgumentCaptor<KeycloakSessionFactory> factory = ArgumentCaptor.forClass(KeycloakSessionFactory.class);
-
-        try (MockedStatic<KeycloakModelUtils> ms = mockStatic(KeycloakModelUtils.class)) {
-            initializer.onEvent(event);
-            ms.verify(() -> KeycloakModelUtils.runJobInTransaction(factory.capture(), task.capture()));
-        }
-
-        assertThat(factory.getValue()).isSameAs(event.getFactory());
-
-        ArgumentCaptor<KeycloakSession> session = ArgumentCaptor.forClass(KeycloakSession.class);
-        ArgumentCaptor<Boolean> dryRunCaptor = ArgumentCaptor.forClass(Boolean.class);
-
-        task.getValue().run(event.getFactory().create());
-
-        verify(realmsFormer).form(any(), session.capture(), dryRunCaptor.capture());
-
-        assertThat(session.getValue()).isSameAs(event.getFactory().create());
-        assertThat(dryRunCaptor.getValue()).isEqualTo(dryRun);
     }
 
     @Test
@@ -121,7 +90,7 @@ class FormingInitializerTest {
 
         task.getValue().run(event.getFactory().create());
 
-        verify(realmsFormer).form(definition.capture(), any(), anyBoolean());
+        verify(realmsFormer).form(definition.capture(), any(), eq(SyncMode.FULL));
 
         assertThat(definition.getValue()).isNotNull();
         assertThat(definition.getValue())

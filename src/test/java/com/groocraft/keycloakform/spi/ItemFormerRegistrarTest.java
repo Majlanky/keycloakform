@@ -49,7 +49,7 @@ class ItemFormerRegistrarTest {
     @BeforeEach
     void setUp() {
         registrar = new FormerRegistrar();
-        sourceFilePath = getClass().getClassLoader().getResource("realm-export.json").getPath();
+        sourceFilePath = getClass().getClassLoader().getResource("realm.json").getPath();
         scope = Mockito.mock(Config.Scope.class);
     }
 
@@ -60,7 +60,7 @@ class ItemFormerRegistrarTest {
         when(scope.get("sourceFile", "")).thenReturn(sourceFilePath);
         when(scope.getBoolean("dryRun", false)).thenReturn(dryRun);
         try (MockedConstruction<FormingInitializer> mc = Mockito.mockConstruction(FormingInitializer.class,
-            (m, c) -> config.set((FormerConfig) c.arguments().get(0)))) {
+            (m, c) -> config.set((FormerConfig) c.arguments().getFirst()))) {
             registrar.init(scope);
             assertThat(config.get()).isNotNull();
             assertThat(config.get().getSourceFile()).isEqualTo(sourceFilePath);

@@ -18,18 +18,16 @@ package com.groocraft.keycloakform.former.collection;
 
 import com.groocraft.keycloakform.definition.ClientDefinition;
 import com.groocraft.keycloakform.definition.DefinitionMapping;
-import com.groocraft.keycloakform.definition.RealmDefinition;
 import com.groocraft.keycloakform.definition.deserialization.Deserialization;
+import com.groocraft.keycloakform.former.FormerContext;
+import com.groocraft.keycloakform.former.SyncMode;
 import com.groocraft.keycloakform.former.item.ClientFormer;
 import com.groocraft.keycloakform.utils.TestFormersFactory;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.KeycloakSession;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -53,7 +51,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ClientsFormerTest {
 
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS) KeycloakSession session;
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS) FormerContext context;
     @Mock ClientFormer clientFormer;
 
     TestFormersFactory formersFactory = new TestFormersFactory();
@@ -62,76 +60,60 @@ class ClientsFormerTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        URL definitionUrl = getClass().getClassLoader().getResource("realm-export.json");
+        URL definitionUrl = getClass().getClassLoader().getResource("realm.json");
         definitions = DefinitionMapping.cast(Deserialization.getRealmsFromStream(definitionUrl.openStream()).getFirst().getClients());
         formersFactory.registerMock(ClientDefinition.class, clientFormer);
         former = new ClientsFormer(formersFactory);
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void testFormerRespectsDryRun(boolean dryRun) {
-        former.form(definitions, session, dryRun);
-
-        verify(clientFormer, times(11)).form(any(), eq(session), eq(dryRun));
-        verifyNoMoreInteractions(clientFormer);
-    }
-
     @Test
     void testFormerIsFormingOnlyManagedClients() {
-        former.form(definitions, session, false);
+        former.form(definitions, context, SyncMode.FULL);
 
         ArgumentCaptor<ClientDefinition> definitionCaptor = ArgumentCaptor.forClass(ClientDefinition.class);
 
-        verify(clientFormer, times(11)).form(definitionCaptor.capture(), eq(session), eq(false));
+        verify(clientFormer, times(7)).form(definitionCaptor.capture(), eq(context));
         verifyNoMoreInteractions(clientFormer);
 
         assertThat(definitionCaptor.getAllValues()).map(ClientDefinition::getName).containsExactlyInAnyOrder(
-            "unmanaged",
             "${client_account}",
             "${client_account-console}",
             "${client_admin-cli}",
             "${client_broker}",
-            "",
-            "",
-            "",
-            "",
+            "Test",
             "${client_realm-management}",
             "${client_security-admin-console}");
     }
 
     @Test
-    void testFormerIsDeletingNoClientWhenDryRun() {
-
+    void testFormerIsDeletingNoClientWhenSyncModeIgnore() {
         ClientModel firstModel = mock(ClientModel.class);
         ClientModel secondModel = mock(ClientModel.class);
-        when(firstModel.getName()).thenReturn("first");
-        when(secondModel.getName()).thenReturn("second");
 
-        when(session.getContext().getRealm().getClientsStream()).thenReturn(Stream.of(firstModel, secondModel));
+        when(context.getRealm().getClientsStream()).thenReturn(Stream.of(firstModel, secondModel));
 
-        former.form(definitions, session, true);
+        former.form(definitions, context, SyncMode.IGNORE);
 
-        verify(session.getContext().getRealm(), never()).removeClient(any());
+        verify(context.getRealm(), never()).removeClient(any());
     }
 
     @Test
-    void testFormerIsDeletingExcessRealmWhenNotDryrun() {
+    void testFormerIsDeletingExcessRealmWhenSyncModeFull() {
         ClientModel firstModel = mock(ClientModel.class);
         ClientModel secondModel = mock(ClientModel.class);
-        when(firstModel.getId()).thenReturn("first");
-        when(firstModel.getName()).thenReturn("first");
-        when(secondModel.getId()).thenReturn("second");
-        when(secondModel.getName()).thenReturn("second");
+        when(firstModel.getClientId()).thenReturn("first");
+        when(firstModel.getId()).thenReturn("first-id");
+        when(secondModel.getClientId()).thenReturn("second");
+        when(secondModel.getId()).thenReturn("second-id");
 
         ArgumentCaptor<String> idCaptor = ArgumentCaptor.forClass(String.class);
 
-        when(session.getContext().getRealm().getClientsStream()).thenReturn(Stream.of(firstModel, secondModel));
-        when(session.getContext().getRealm().removeClient(idCaptor.capture())).thenReturn(true);
+        when(context.getRealm().getClientsStream()).thenReturn(Stream.of(firstModel, secondModel));
+        when(context.getRealm().removeClient(idCaptor.capture())).thenReturn(true);
 
-        former.form(definitions, session, false);
+        former.form(definitions, context, SyncMode.FULL);
 
-        assertThat(idCaptor.getAllValues()).containsExactlyInAnyOrder("first", "second");
+        assertThat(idCaptor.getAllValues()).containsExactlyInAnyOrder("first-id", "second-id");
 
     }
 

@@ -16,8 +16,6 @@
 
 package com.groocraft.keycloakform.former;
 
-import org.keycloak.models.KeycloakSession;
-
 /**
  * Former implementation cares about forming Keycloak internal state to the desired state following the definition.
  * One former is designed to form only one type of resource
@@ -30,10 +28,9 @@ public interface ItemFormer<DefinitionT> {
      * Form the Keycloak internal state to the desired state following the provided definition.
      *
      * @param definition the definition of the resource state
-     * @param session    the Keycloak session
-     * @param dryRun     true if the operation is a dry run, false otherwise
+     * @param context    context of forming
      */
-    void form(DefinitionT definition, KeycloakSession session, boolean dryRun);
+    void form(DefinitionT definition, FormerContext context);
 
     /**
      * Retrieves the class object that represents the type of the definition associated with the implementation.

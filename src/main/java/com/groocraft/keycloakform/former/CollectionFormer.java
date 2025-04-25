@@ -16,8 +16,6 @@
 
 package com.groocraft.keycloakform.former;
 
-import org.keycloak.models.KeycloakSession;
-
 import java.util.Collection;
 
 public interface CollectionFormer<DefinitionT> {
@@ -26,10 +24,9 @@ public interface CollectionFormer<DefinitionT> {
      * Form the Keycloak internal state to the desired state following the provided definition.
      *
      * @param definition the definition of the resource state
-     * @param session    the Keycloak session
-     * @param dryRun     true if the operation is a dry run, false otherwise
+     * @param context    context of forming
      */
-    void form(Collection<DefinitionT> definition, KeycloakSession session, boolean dryRun);
+    void form(Collection<DefinitionT> definition, FormerContext context, SyncMode syncMode);
 
     /**
      * Retrieves the class object that represents the type of the definition associated with the implementation.

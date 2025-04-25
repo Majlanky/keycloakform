@@ -16,39 +16,60 @@
 
 package com.groocraft.keycloakform.former.item;
 
+import com.groocraft.keycloakform.definition.AuthenticationFlowDefinition;
+import com.groocraft.keycloakform.definition.AuthenticatorConfigDefinition;
 import com.groocraft.keycloakform.definition.ClientDefinition;
+import com.groocraft.keycloakform.definition.ClientScopeDefinition;
+import com.groocraft.keycloakform.definition.ComponentDefinition;
+import com.groocraft.keycloakform.definition.GroupDefinition;
+import com.groocraft.keycloakform.definition.IdentityProviderDefinition;
+import com.groocraft.keycloakform.definition.IdentityProviderMapperDefinition;
 import com.groocraft.keycloakform.definition.RealmDefinition;
+import com.groocraft.keycloakform.definition.RequiredActionDefinition;
+import com.groocraft.keycloakform.definition.RoleDefinition;
+import com.groocraft.keycloakform.definition.RolesDefinition;
+import com.groocraft.keycloakform.definition.ScopeDefinitionHelper;
 import com.groocraft.keycloakform.definition.deserialization.Deserialization;
+import com.groocraft.keycloakform.former.FormerContext;
+import com.groocraft.keycloakform.former.SyncMode;
+import com.groocraft.keycloakform.former.collection.AuthenticationFlowsFormer;
+import com.groocraft.keycloakform.former.collection.AuthenticatorConfigsFormer;
+import com.groocraft.keycloakform.former.collection.ClientScopesFormer;
 import com.groocraft.keycloakform.former.collection.ClientsFormer;
+import com.groocraft.keycloakform.former.collection.ComponentsFormer;
+import com.groocraft.keycloakform.former.collection.GroupsFormer;
+import com.groocraft.keycloakform.former.collection.IdentityProviderMappersFormer;
+import com.groocraft.keycloakform.former.collection.IdentityProvidersFormer;
+import com.groocraft.keycloakform.former.collection.RequiredActionsFormer;
+import com.groocraft.keycloakform.former.collection.RolesFormer;
 import com.groocraft.keycloakform.utils.TestFormersFactory;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.CibaConfig;
+import org.keycloak.models.ClientModel;
+import org.keycloak.models.OAuth2DeviceConfig;
+import org.keycloak.models.ParConfig;
 import org.keycloak.models.RealmModel;
 import org.keycloak.services.managers.RealmManager;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mockConstruction;
-import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,9 +77,25 @@ class RealmFormerTest {
 
     TestFormersFactory formersFactory = new TestFormersFactory();
 
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS) KeycloakSession session;
-    @Mock RealmModel realmModel;
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS) FormerContext context;
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS) RealmModel realmModel;
+    @Mock RealmModel adminRealmModel;
+    @Mock ClientModel clientModel;
     @Mock ClientsFormer clientsFormer;
+    @Mock ClientScopesFormer clientScopesFormer;
+    @Mock RolesFormer rolesFormer;
+    @Mock ComponentsFormer componentsFormer;
+    @Mock RoleCompositesFormer roleCompositesFormer;
+    @Mock AuthenticatorConfigsFormer authenticatorConfigsFormer;
+    @Mock AuthenticationFlowsFormer authenticationFlowsFormer;
+    @Mock RequiredActionsFormer requiredActionsFormer;
+    @Mock ScopeMappingsFormer scopeMappingsFormer;
+    @Mock IdentityProvidersFormer identityProvidersFormer;
+    @Mock GroupsFormer groupsFormer;
+    @Mock IdentityProviderMappersFormer identityProviderMappersFormer;
+    @Mock OAuth2DeviceConfig oAuth2DeviceConfig;
+    @Mock CibaConfig cibaConfig;
+    @Mock ParConfig parConfig;
 
     RealmFormer former;
     RealmDefinition testDefinition;
@@ -67,8 +104,19 @@ class RealmFormerTest {
     @BeforeEach
     void setUp() throws IOException {
         formersFactory.registerCollectionMock(ClientDefinition.class, clientsFormer);
+        formersFactory.registerCollectionMock(ClientScopeDefinition.class, clientScopesFormer);
+        formersFactory.registerCollectionMock(RoleDefinition.class, rolesFormer);
+        formersFactory.registerMock(RolesDefinition.class, roleCompositesFormer);
+        formersFactory.registerCollectionMock(AuthenticatorConfigDefinition.class, authenticatorConfigsFormer);
+        formersFactory.registerCollectionMock(AuthenticationFlowDefinition.class, authenticationFlowsFormer);
+        formersFactory.registerCollectionMock(RequiredActionDefinition.class, requiredActionsFormer);
+        formersFactory.registerCollectionMock(ComponentDefinition.class, componentsFormer);
+        formersFactory.registerMock(ScopeDefinitionHelper.class, scopeMappingsFormer);
+        formersFactory.registerCollectionMock(IdentityProviderDefinition.class, identityProvidersFormer);
+        formersFactory.registerCollectionMock(IdentityProviderMapperDefinition.class, identityProviderMappersFormer);
+        formersFactory.registerCollectionMock(GroupDefinition.class, groupsFormer);
         former = new RealmFormer(formersFactory);
-        URL definitionUrl = getClass().getClassLoader().getResource("multi-realm-export.json");
+        URL definitionUrl = getClass().getClassLoader().getResource("realms.json");
         List<RealmDefinition> definitions = Deserialization.getRealmsFromStream(definitionUrl.openStream());
         testDefinition = definitions
             .stream().filter(rd -> rd.getRealm().equals("test")).findFirst().orElseThrow();
@@ -76,117 +124,93 @@ class RealmFormerTest {
             .stream().filter(rd -> rd.getRealm().equals("master")).findFirst().orElseThrow();
     }
 
-
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void testSubFormersAreCalledPassingProperValues(boolean dryRun) {
-        when(session.realms().getRealm(anyString())).thenReturn(realmModel);
+    @Test
+    void testSubFormersAreCalledPassingProperValues() {
+        when(context.getSession().realms().getRealmByName(anyString())).thenReturn(realmModel);
+        when(realmModel.getDefaultRole()).thenReturn(null);
+        when(realmModel.getName()).thenReturn("test");
+        when(realmModel.getOAuth2DeviceConfig()).thenReturn(oAuth2DeviceConfig);
+        when(realmModel.getCibaPolicy()).thenReturn(cibaConfig);
+        when(realmModel.getParPolicy()).thenReturn(parConfig);
+        when(context.getRealm().getClientScopesStream()).thenAnswer(i -> Stream.of());
 
         try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class)) {
-            former.form(testDefinition, session, dryRun);
+            former.form(testDefinition, context);
         }
 
-        verify(clientsFormer).form(any(), eq(session), eq(dryRun));
+        verify(clientsFormer).form(any(), eq(context), eq(SyncMode.FULL));
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void testKeycloakSessionContextIsSetAndUnset(boolean dryRun) {
-        when(session.realms().getRealm(anyString())).thenReturn(realmModel);
+    @Test
+    void testKeycloakSessionContextIsSetAndUnset() {
+        when(context.getSession().realms().getRealmByName(anyString())).thenReturn(realmModel);
+        when(realmModel.getDefaultRole()).thenReturn(null);
+        when(realmModel.getName()).thenReturn("test");
+        when(realmModel.getOAuth2DeviceConfig()).thenReturn(oAuth2DeviceConfig);
+        when(realmModel.getCibaPolicy()).thenReturn(cibaConfig);
+        when(realmModel.getParPolicy()).thenReturn(parConfig);
+        when(context.getRealm().getClientScopesStream()).thenAnswer(i -> Stream.of());
 
         try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class)) {
-            former.form(testDefinition, session, dryRun);
+            former.form(testDefinition, context);
             assertThat(mrm.constructed()).isEmpty();
         }
 
-        verify(session.getContext()).setRealm(realmModel);
-        verify(session.getContext()).setRealm(null);
-    }
-
-    //FIXME
-    //    @Test
-    //    void testUpdateCommitIsCalledWhenNotDryRun() {
-    //
-    //    }
-    //
-    //    @Test
-    //    void testUpdateCommitIsNotCalledWhenDryRun() {
-    //
-    //    }
-
-    @Test
-    void testFormerTakesRealmIdPriorToNameWhenSearch() {
-        former.form(testDefinition, session, true);
-
-        verify(session.realms(), Mockito.times(1)).getRealm(anyString());
-        verifyNoMoreInteractions(session.realms());
-    }
-
-    @Test
-    void testFormerTakesRealmIdPriorToNameWhenCreate() {
-        when(session.realms().getRealm(anyString())).thenReturn(null);
-        ArgumentCaptor<String> idCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
-        try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class,
-            (m, c) -> when(m.createRealm(idCaptor.capture(), nameCaptor.capture())).thenReturn(realmModel))) {
-            former.form(testDefinition, session, false);
-        }
-
-        assertThat(idCaptor.getAllValues()).containsExactly("3a98f829-fd9c-4366-bf08-003370120f11");
-        assertThat(nameCaptor.getAllValues()).containsExactly("test");
-    }
-
-    @Test
-    void testFormerDoesNotUpdateNorCreateWhenDryRun() {
-        when(session.realms().getRealm(anyString())).thenReturn(realmModel);
-
-        try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class)) {
-            former.form(testDefinition, session, true);
-            assertThat(mrm.constructed()).isEmpty();
-        }
-
-        assertThat(mockingDetails(realmModel).getInvocations())
-            .map(i -> i.getMethod().getName().substring(0, 3)).doesNotContain("set");
-
+        verify(context).setRealm(any(RealmModel.class));
+        verify(context).setRealmDefinition(testDefinition);
+        verify(context).setRealm(null);
+        verify(context).setRealmDefinition(null);
     }
 
     @Test
     void testFormerCreatesMissingRealm() {
-        when(session.realms().getRealm(anyString())).thenReturn(null);
-
+        when(context.getSession().realms().getRealmByName("test")).thenReturn(null);
+        ArgumentCaptor<String> idCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
-        try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class,
-            (m, c) -> when(m.createRealm(any(), nameCaptor.capture())).thenReturn(realmModel))) {
-            former.form(testDefinition, session, false);
-        }
+        when(context.getSession().realms().createRealm(idCaptor.capture(), nameCaptor.capture())).thenReturn(realmModel);
+        when(realmModel.getDefaultRole()).thenReturn(null);
+        when(realmModel.getName()).thenReturn("test");
+        when(context.getSession().realms().getRealmByName("master")).thenReturn(adminRealmModel);
+        when(realmModel.getOAuth2DeviceConfig()).thenReturn(oAuth2DeviceConfig);
+        when(realmModel.getCibaPolicy()).thenReturn(cibaConfig);
+        when(realmModel.getParPolicy()).thenReturn(parConfig);
+        when(context.getRealm().getClientScopesStream()).thenAnswer(i -> Stream.of());
 
+        former.form(testDefinition, context);
+
+        assertThat(idCaptor.getAllValues()).containsExactly("983dcadf-da2e-45eb-9fe5-1e53475bcbbe");
         assertThat(nameCaptor.getAllValues()).containsExactly("test");
     }
 
     @Test
-    void testFormerNotCreatesMissingRealmWhenNotManaged() {
-        when(session.realms().getRealmByName(anyString())).thenReturn(null);
+    void testFormerNotCreatesMissingRealmWhenSyncModeIgnore() {
+        when(context.getSession().realms().getRealmByName("master")).thenReturn(null);
+        when(context.getSession().realms().createRealm(any(), any())).thenReturn(realmModel);
+        when(realmModel.getName()).thenReturn("master");
 
         ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
-        try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class,
-            (m, c) -> when(m.createRealm(nameCaptor.capture())).thenReturn(realmModel))) {
-            former.form(masterDefinition, session, false);
-        }
+
+        former.form(masterDefinition, context);
 
         assertThat(nameCaptor.getAllValues()).isEmpty();
     }
 
     @Test
     void testFormerUpdatesExistingRealm() {
-        when(session.realms().getRealm(anyString())).thenReturn(realmModel);
-        when(realmModel.getName()).thenReturn("test2");
+        when(context.getSession().realms().getRealmByName(anyString())).thenReturn(realmModel);
+        when(realmModel.getDefaultRole()).thenReturn(null);
+        when(realmModel.getName()).thenReturn("test");
+        when(realmModel.getOAuth2DeviceConfig()).thenReturn(oAuth2DeviceConfig);
+        when(realmModel.getCibaPolicy()).thenReturn(cibaConfig);
+        when(realmModel.getParPolicy()).thenReturn(parConfig);
+        when(context.getRealm().getClientScopesStream()).thenAnswer(i -> Stream.of());
 
         try (MockedConstruction<RealmManager> mrm = mockConstruction(RealmManager.class)) {
-            former.form(testDefinition, session, false);
+            former.form(testDefinition, context);
             assertThat(mrm.constructed()).isEmpty();
         }
 
-        verify(realmModel).setName("test");
+        verify(realmModel).setAccessTokenLifespan(300);
     }
 
 }

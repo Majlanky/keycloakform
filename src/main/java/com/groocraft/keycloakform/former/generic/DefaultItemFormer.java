@@ -17,13 +17,15 @@
 package com.groocraft.keycloakform.former.generic;
 
 import com.groocraft.keycloakform.definition.Definition;
+import com.groocraft.keycloakform.exception.ModelProxyException;
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.ItemFormer;
+import com.groocraft.keycloakform.former.SyncMode;
 
 import org.jboss.logging.Logger;
-import org.keycloak.models.KeycloakSession;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Proxy;
+import javassist.util.proxy.MethodHandler;
+import javassist.util.proxy.ProxyFactory;
 
 /**
  * The ItemFormer class is an abstract implementation of the {@link ItemFormer} interface,
@@ -49,64 +51,69 @@ public abstract class DefaultItemFormer<KeycloakT, DefinitionT extends Definitio
         this.log = log;
     }
 
-    protected abstract KeycloakT getKeycloakResource(DefinitionT definition, KeycloakSession session);
+    protected abstract KeycloakT getModel(DefinitionT definition, FormerContext context);
 
-    protected abstract KeycloakT create(DefinitionT definition, KeycloakSession session);
+    protected abstract KeycloakT create(DefinitionT definition, FormerContext context);
 
-    protected abstract void update(KeycloakT keycloakResource, DefinitionT definition);
-
-    protected abstract void updateCommit(KeycloakT keycloakResource, KeycloakSession session);
+    protected abstract void update(KeycloakT keycloakResource, DefinitionT definition, FormerContext context);
 
     protected abstract Class<KeycloakT> getKeycloakResourceClass();
 
     protected abstract String getLogIdentifier(DefinitionT definition);
 
-    protected void update(KeycloakT keycloakResource, DefinitionT definition, KeycloakSession session,
-                          boolean dryRun, String logIdentifier) {
-        ItemFormerInvocationHandler handler = new ItemFormerInvocationHandler(keycloakResource, dryRun);
+    protected void update(KeycloakT keycloakResource, DefinitionT definition, FormerContext context, String logIdentifier) {
+        StringBuilder changeLog = new StringBuilder();
+        ItemFormerMethodHandler handler = new ItemFormerMethodHandler(keycloakResource,
+            (attribute, original, current) -> changeLog.append(attribute)
+                .append(": ")
+                .append(original)
+                .append(" >>> ")
+                .append(current)
+                .append('\n'));
         KeycloakT proxiedResource = proxyOf(getKeycloakResourceClass(), handler);
-        update(proxiedResource, definition);
-        String changeLog = String.join(",\n ", handler.getChangeLog());
+        update(proxiedResource, definition, context);
         if (changeLog.isEmpty()) {
-            log.infof("%s %s because of no changes", logIdentifier, dryRun ? "would not be updated" : " not updated");
+            log.infof("%s without changes", logIdentifier);
         } else {
-            if(!dryRun){
-                updateCommit(keycloakResource, session);
-            }
-            log.infof("%s %s with the following changes:\n %s",
+            log.infof("%s updated with the following changes:\n %s",
                 logIdentifier,
-                dryRun ? "would be updated" : "updated",
                 changeLog);
         }
     }
 
-    public void form(DefinitionT definition, KeycloakSession session, boolean dryRun) {
+    @Override
+    public void form(DefinitionT definition, FormerContext context) {
+        //FIXME validate(definition);
         String logIdentifier = getLogIdentifier(definition);
-        if (!definition.isManaged()) {
-            log.infof("%s is marked as unmanaged, skipping it", logIdentifier);
+        if (definition.getSyncMode() == SyncMode.IGNORE) {
+            log.infof("%s sync mode IGNORE, skipping it", logIdentifier);
             return;
         }
 
-        KeycloakT keycloakResource = getKeycloakResource(definition, session);
+        KeycloakT keycloakResource = getModel(definition, context);
 
         if (keycloakResource == null) {
-            if (dryRun) {
-                log.infof("%s does not exist, will be mocked hence in change log it will report original values as null",
-                    logIdentifier);
-            } else {
-                log.infof("%s does not exist, will be created right now", logIdentifier);
-                keycloakResource = create(definition, session);
-            }
+            log.infof("%s does not exist, will be created and formed", logIdentifier);
+            keycloakResource = create(definition, context);
         } else {
-            log.infof("%s exits and %s", logIdentifier, dryRun ? "would be updated" : "will be updated");
+            log.infof("%s exits and will be formed", logIdentifier);
         }
-        update(keycloakResource, definition, session, dryRun, logIdentifier);
+        update(keycloakResource, definition, context, logIdentifier);
     }
 
-    private <T> T proxyOf(Class<?> clazz, InvocationHandler handler) {
-        return (T) Proxy.newProxyInstance(clazz.getClassLoader(),
-            new Class<?>[] {clazz},
-            handler);
+    @SuppressWarnings("unchecked")
+    private <T> T proxyOf(Class<?> clazz, MethodHandler handler) {
+        ProxyFactory factory = new ProxyFactory();
+        if (clazz.isInterface()) {
+            factory.setInterfaces(new Class<?>[] {clazz});
+        } else {
+            factory.setSuperclass(clazz);
+        }
+        try {
+            return (T) factory.create(new Class<?>[0], new Object[0], handler);
+        } catch (Exception e) {
+            throw new ModelProxyException(clazz, e);
+        }
     }
 
 }

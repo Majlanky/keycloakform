@@ -16,6 +16,7 @@
 
 package com.groocraft.keycloakform.updater;
 
+import com.groocraft.keycloakform.former.FormerContext;
 import com.groocraft.keycloakform.former.ItemFormer;
 
 /**
@@ -36,7 +37,8 @@ public interface Updater<KeycloakT, DefinitionT> {
      *
      * @param keycloakResource that will be updated when not dry run and only different values are really set
      * @param definition       used as source of wanted state
+     * @param context          context of the forming providing sources outside of model and definition if needed
      */
-    void update(KeycloakT keycloakResource, DefinitionT definition);
+    void update(KeycloakT keycloakResource, DefinitionT definition, FormerContext context);
 
 }
